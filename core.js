@@ -1,6 +1,10 @@
 export const STORAGE_KEY = 'diyuk-progress-v1';
 export const MAX_ATTEMPTS = 30;
 
+export function progressKey(bank) {
+  return bank.revision === 1 ? STORAGE_KEY : `${STORAGE_KEY}:${bank.id}:r${bank.revision}`;
+}
+
 function check(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -16,7 +20,7 @@ export function validateBank(bank) {
   for (const q of bank.questions) {
     check(typeof q.id === 'string' && !ids.has(q.id), 'מזהה שאלה כפול או חסר.');
     ids.add(q.id);
-    for (const field of ['title', 'prompt', 'anchor', 'skill', 'process', 'model']) {
+    for (const field of ['title', 'prompt', 'anchor', 'skill', 'process', 'model', 'reasoning', 'boundary']) {
       check(typeof q[field] === 'string' && q[field].length > 0, `חסר שדה ${field}.`);
     }
     for (const [field, key] of [['options', 'correctOption'], ['evidence', 'correctEvidence']]) {
@@ -30,6 +34,7 @@ export function validateBank(bank) {
       check(optionIds.has(q[key]), 'המפתח מפנה לאפשרות שאינה קיימת.');
     }
     check(Array.isArray(q.rubric) && q.rubric.length === 2 && q.rubric.every(x => typeof x === 'string'), 'מחוון הדיוק אינו תקין.');
+    check(Array.isArray(q.answerSteps) && q.answerSteps.length >= 2 && q.answerSteps.every(x => typeof x === 'string' && x.length > 0), 'חסרים שלבי ביאור.');
   }
   return bank;
 }

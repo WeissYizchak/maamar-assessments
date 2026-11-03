@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { validateBank, validateProgress, emptyProgress, newRun, score, summarize, MAX_ATTEMPTS } from '../core.js';
+import { STORAGE_KEY, progressKey, validateBank, validateProgress, emptyProgress, newRun, score, summarize, MAX_ATTEMPTS } from '../core.js';
 
 const bank = JSON.parse(await readFile(new URL('../questions.json', import.meta.url), 'utf8'));
 
@@ -19,14 +19,17 @@ test('bank has reviewed structure, unique ids, valid answer keys and precise loc
   assert.equal(validateBank(bank), bank);
   assert.equal(bank.reviewStatus, 'draft');
   assert.equal(bank.questions.length, 4);
-  assert.ok(bank.questions.every(q => q.anchor && q.model && q.rubric.length === 2));
+  assert.equal(bank.revision, 2);
+  assert.ok(bank.questions.every(q => q.anchor && q.model && q.reasoning && q.boundary && q.answerSteps.length >= 2 && q.rubric.length === 2));
 });
 
 test('conclusion and evidence are scored independently; no invented precision score', () => {
   const q = bank.questions[0];
   assert.deepEqual(score(q, answer(q)), { conclusion: 1, evidence: 1, precision: null });
-  assert.deepEqual(score(q, answer(q, { evidence: 'walking', written: 'הסבר', precision: 1 })), { conclusion: 1, evidence: 0, precision: 1 });
-  assert.deepEqual(score(q, answer(q, { option: 'universal' })), { conclusion: 0, evidence: 1, precision: null });
+  const wrongEvidence = q.evidence.find(e => e.id !== q.correctEvidence).id;
+  const wrongOption = q.options.find(o => o.id !== q.correctOption).id;
+  assert.deepEqual(score(q, answer(q, { evidence: wrongEvidence, written: 'הסבר', precision: 1 })), { conclusion: 1, evidence: 0, precision: 1 });
+  assert.deepEqual(score(q, answer(q, { option: wrongOption })), { conclusion: 0, evidence: 1, precision: null });
 });
 
 test('backup round trip preserves completed and active runs and written explanations', () => {
@@ -39,7 +42,7 @@ test('backup round trip preserves completed and active runs and written explanat
 
 test('retries include either automatic error and low self rating, not missing self rating', () => {
   const run = completed();
-  run.answers[0].evidence = 'walking';
+  run.answers[0].evidence = bank.questions[0].evidence.find(e => e.id !== bank.questions[0].correctEvidence).id;
   run.answers[1].written = 'הסבר';
   run.answers[1].precision = 1;
   const result = summarize(run, bank);
@@ -78,4 +81,26 @@ test('answer-key and identifier mistakes fail bank validation', () => {
   copy.questions[0].correctEvidence = bank.questions[0].correctEvidence;
   copy.questions[1].id = copy.questions[0].id;
   assert.throws(() => validateBank(copy));
+});
+
+test('new content revisions use isolated storage while legacy progress remains addressable', () => {
+  const oldKey = progressKey({ ...bank, revision: 1 });
+  assert.equal(oldKey, STORAGE_KEY);
+  assert.notEqual(progressKey(bank), oldKey);
+  assert.notEqual(progressKey(bank), progressKey({ ...bank, revision: 3 }));
+  const stored = new Map([[oldKey, 'previous attempts']]);
+  stored.set(progressKey(bank), JSON.stringify(emptyProgress()));
+  assert.equal(stored.get(oldKey), 'previous attempts');
+  assert.deepEqual(JSON.parse(stored.get(progressKey(bank))), emptyProgress());
+  const oldRun = completed();
+  oldRun.revision = 1;
+  assert.throws(() => validateProgress({ ...emptyProgress(), attempts: [oldRun] }, bank));
+});
+
+test('full explanations, reasoning demands and precision boundaries cannot be omitted', () => {
+  for (const [field, invalid] of [['answerSteps', []], ['reasoning', ''], ['boundary', '']]) {
+    const copy = structuredClone(bank);
+    copy.questions[0][field] = invalid;
+    assert.throws(() => validateBank(copy));
+  }
 });

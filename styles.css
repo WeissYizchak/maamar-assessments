@@ -25,14 +25,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .brand-sub { display: block; font-size: 11px; font-weight: 500; letter-spacing: .04em; color: var(--muted); }
 .header-note { font-size: 13px; color: var(--muted); }
 main { max-width: 1000px; margin: auto; padding: 36px 24px 64px; outline: none; min-height: 65vh; }
-.hero { padding: 26px 0 36px; max-width: 700px; }
+.hero { padding: 12px 0 20px; max-width: 700px; }
 .eyebrow { font-size: 13px; font-weight: 600; color: var(--accent); margin: 0 0 12px; }
 h1, h2, h3, p { overflow-wrap: anywhere; }
 h1 { font-family: "Noto Serif Hebrew", Georgia, serif; font-weight: 600; font-size: clamp(32px, 5.4vw, 56px); line-height: 1.35; white-space: pre-line; margin: 0 0 20px; letter-spacing: -.035em; }
 h2 { font-size: 24px; margin: 0 0 12px; }
 h3 { font-size: 18px; margin: 0 0 8px; }
 p { line-height: 1.85; margin: 0 0 16px; }
-.hero-description { font-size: 18px; color: var(--muted); max-width: 620px; }
 .card { background: #fffdf8; border: 1px solid var(--line); border-radius: 20px; padding: 32px; box-shadow: 0 8px 30px #183f3905; }
 .maamar-card { border-top: 4px solid var(--ink); }
 .maamar-card h2 { font-family: "Noto Serif Hebrew", Georgia, serif; font-size: 34px; }
@@ -48,9 +47,6 @@ p { line-height: 1.85; margin: 0 0 16px; }
 .button.secondary:hover { background: #edf1e9; }
 .text-button { color: var(--ink); background: transparent; border: 0; text-decoration: underline; text-underline-offset: 4px; padding: 10px; min-height: 44px; }
 .source-link { font-size: 13px; display: inline-block; padding: 6px 0; }
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; padding: 40px 0; border-bottom: 1px solid var(--line); }
-.step-number { display: block; color: var(--accent); font-size: 13px; margin-bottom: 12px; }
-.steps p { font-size: 14px; margin-bottom: 0; }
 .history { margin-top: 36px; }
 .history-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .quiz-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -62,6 +58,7 @@ progress { width: 100%; height: 8px; accent-color: var(--ink); margin: 12px 0 20
 details { border-block: 1px solid var(--line); padding: 12px 0; margin: 16px 0; }
 summary { cursor: pointer; font-size: 14px; font-weight: 500; }
 details p { margin-top: 16px; }
+details li { line-height: 1.85; margin-bottom: 12px; }
 fieldset { border: 0; padding: 0; margin: 28px 0; min-width: 0; }
 legend { font-size: 16px; font-weight: 700; padding: 0; margin-bottom: 12px; }
 .choice { display: flex; align-items: flex-start; gap: 12px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 10px; line-height: 1.8; cursor: pointer; background: white; }
@@ -88,6 +85,7 @@ textarea { width: 100%; border: 1px solid #aab9aa; border-radius: 10px; padding:
 .notice { max-width: 952px; margin: 0 auto 24px; padding: 20px; background: #fff0df; border: 1px solid #c38857; border-radius: 10px; line-height: 1.8; }
 footer { border-top: 1px solid var(--line); padding: 28px 24px; text-align: center; color: var(--muted); font-size: 12px; }
 footer p { margin-bottom: 8px; }
+footer details { max-width: 600px; margin: 16px auto; }
 .footer-tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .loading { padding: 60px 0; }
 @media (max-width: 600px) {
@@ -96,8 +94,6 @@ footer p { margin-bottom: 8px; }
   main { padding: 24px 16px 40px; }
   .hero { padding: 12px 0 20px; }
   .card { padding: 22px 18px; border-radius: 14px; }
-  .steps { gap: 20px; grid-template-columns: 1fr; padding: 28px 0; }
-  .step-number { float: right; margin-left: 16px; margin-top: 4px; }
   .metrics { grid-template-columns: 1fr; gap: 10px; }
   .metric { padding: 16px; }
   .metric strong { font-size: 30px; }
