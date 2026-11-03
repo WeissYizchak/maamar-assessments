@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#183f39">
+    <meta name="description" content="מבדקים ללימוד מדויק בתורה אור וליקוטי תורה: ביאור, ראיה ודיוק מתוך המאמר.">
+    <title>דיוק · מבדקים במאמרי חסידות</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="דיוק — עמוד הבית"><span class="brand-mark">ד</span><span>דיוק<span class="brand-sub">ללמוד. להבין. לדייק.</span></span></a>
+      <span class="header-note">תורה אור · ליקוטי תורה</span>
+    </header>
+    <main id="main" tabindex="-1">
+      <p class="loading">טוענים את המבדק…</p>
+      <noscript>כדי לבצע את המבדק יש להפעיל JavaScript בדפדפן.</noscript>
+    </main>
+    <aside id="notice" class="notice" role="alert" hidden></aside>
+    <footer>
+      <p>ההתקדמות נשמרת בדפדפן הזה בלבד · ללא חשבון, ללא שרת וללא מעקב</p>
+      <div class="footer-tools">
+        <button id="export" class="text-button" type="button">ייצוא גיבוי</button>
+        <button id="import" class="text-button" type="button">ייבוא גיבוי</button>
+        <button id="erase" class="text-button" type="button">מחיקת הנתונים שלי</button>
+      </div>
+      <input id="backup-file" type="file" accept="application/json,.json" hidden>
+      <p id="backup-status" role="status"></p>
+    </footer>
+  </body>
+</html>
