@@ -1,4 +1,4 @@
-import { STORAGE_KEY, MAX_ATTEMPTS, validateBank, validateProgress, emptyProgress, newRun, score, summarize } from './core.js';
+import { STORAGE_KEY, MAX_ATTEMPTS, progressKey, validateBank, validateProgress, emptyProgress, newRun, score, summarize } from './core.js';
 
 const main = document.querySelector('#main');
 const notice = document.querySelector('#notice');
@@ -7,6 +7,8 @@ let bank;
 let progress;
 let storageProblem = false;
 let rawStored = null;
+let currentKey;
+let archivedKeys = [];
 
 function el(tag, text, className) {
   const node = document.createElement(tag);
@@ -31,7 +33,7 @@ function report(message, error) {
 function save() {
   if (storageProblem) return false;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    localStorage.setItem(currentKey, JSON.stringify(progress));
     return true;
   } catch (error) {
     report('לא ניתן לשמור בדפדפן. אפשר להמשיך, אך יש לייצא גיבוי לפני יציאה; רענון עלול לאבד את ההתקדמות.', error);
@@ -54,7 +56,7 @@ function sourceLink() {
 
 function draftNote() {
   if (bank.reviewStatus === 'draft') {
-    return el('p', 'גרסת תוכן לבדיקה · השאלות, התשובות והמחוונים הם טיוטות שטרם אושרו.', 'draft-note');
+    return el('p', 'טיוטה · טרם אושר תוכן המבדק', 'draft-note');
   }
   return el('p', 'תוכן מאושר', 'draft-note');
 }
@@ -62,13 +64,13 @@ function draftNote() {
 function home() {
   page();
   const hero = el('section', undefined, 'hero');
-  hero.append(el('p', 'מבדקים במאמרי חסידות', 'eyebrow'), el('h1', 'לא רק להבין.\nלדייק במה שכתוב.'), el('p', 'ביאור יכול להיות נכון — ועדיין לא להיות הביאור של המאמר הזה. כאן בוחנים את ההבנה מול המילים, ההקשר והמהלך.', 'hero-description'));
+  hero.append(el('h1', 'לדייק במה שכתוב.'), el('p', 'מבדקים במאמרי חסידות', 'muted'));
   main.append(hero);
   const card = el('section', undefined, 'card maamar-card');
-  card.append(el('p', 'המאמר הראשון', 'eyebrow'), el('h2', bank.title), el('p', bank.author, 'muted'), draftNote());
+  card.append(el('h2', bank.title), draftNote());
   const tags = el('div', undefined, 'tags');
-  for (const text of [`${bank.questions.length} שאלות`, 'ניתוח והערכה', 'ביאור + ראיה', 'ללא הגבלת זמן']) tags.append(el('span', text, 'tag'));
-  card.append(tags, el('p', 'בכל שאלה בוחרים ביאור וראיה, ורק אז נחשף המשוב. אפשר גם לנסח הסבר ולבדוק אותו בעצמך מול מחוון.'), el('p', bank.source.note, 'small muted'), sourceLink());
+  for (const text of [`${bank.questions.length} שאלות`, 'ביאור + ראיה']) tags.append(el('span', text, 'tag'));
+  card.append(tags);
   const actions = el('div', undefined, 'actions');
   if (progress.active) {
     actions.append(button(`המשך ניסיון · ${progress.active.answers.length}/${progress.active.questionIds.length}`, resume));
@@ -79,21 +81,13 @@ function home() {
     actions.append(button('מתחילים לדייק ←', () => start()));
   }
   card.append(actions);
+  const about = el('details');
+  about.append(el('summary', 'על המבדק והמקור'), el('p', bank.author), el('p', 'בוחרים ביאור, בוחרים ראיה, ואז נחשף המשוב. אפשר להוסיף הסבר ולהעריך אותו בעצמך.'), el('p', bank.source.note, 'small muted'), sourceLink());
+  card.append(about);
   main.append(card);
-  const steps = el('section', undefined, 'steps');
-  for (const [number, title, text] of [
-    ['01', 'בוחרים ביאור', 'מכריעים מה נאמן למאמר, לא רק מה נשמע נכון.'],
-    ['02', 'מעגנים במילים', 'מזהים ראיה שבאמת מבססת את ההכרעה.'],
-    ['03', 'מדייקים בהסבר', 'בודקים שלא הוספנו או הכללנו מעבר לכתוב.']
-  ]) {
-    const item = el('div');
-    item.append(el('span', number, 'step-number'), el('h3', title), el('p', text, 'muted'));
-    steps.append(item);
-  }
-  main.append(steps);
   const history = el('section', undefined, 'history');
   history.append(el('h2', 'הניסיונות שלך'));
-  if (!progress.attempts.length) history.append(el('p', 'עוד אין ניסיונות שהושלמו. ההתקדמות תופיע כאן ותישאר בדפדפן הזה.', 'muted'));
+  if (!progress.attempts.length) history.append(el('p', 'טרם הושלם מבדק.', 'muted'));
   for (const attempt of [...progress.attempts].reverse()) {
     const result = summarize(attempt, bank);
     const row = el('div', undefined, 'history-row');
@@ -141,6 +135,15 @@ function choiceGroup(legend, items, name) {
   return fieldset;
 }
 
+function explanation(q) {
+  const details = el('details');
+  details.append(el('summary', 'המהלך המלא וגבולות הביאור'));
+  const list = el('ol');
+  for (const step of q.answerSteps) list.append(el('li', step));
+  details.append(list, el('p', q.boundary));
+  return details;
+}
+
 function question() {
   const run = progress.active;
   if (run.answers.length === run.questionIds.length) {
@@ -157,17 +160,18 @@ function question() {
   bar.setAttribute('aria-label', 'התקדמות במבדק');
   main.append(top, bar, draftNote());
   const card = el('section', undefined, 'card quiz-card');
-  card.append(el('p', `${q.process} · ${q.skill}`, 'eyebrow'), el('h1', q.title), el('p', q.prompt, 'prompt'));
+  card.append(el('h1', q.title), el('p', q.prompt, 'prompt'));
   const details = el('details');
-  details.append(el('summary', 'היכן לעיין במאמר?'), el('p', q.anchor), sourceLink());
-  card.append(details, el('p', 'התשובות נשמרות לאחר שליחת השאלה. בחירות וטקסט שטרם נשלחו לא יישמרו ביציאה.', 'small muted'));
+  details.append(el('summary', 'מקור והנחיות'), el('p', q.anchor), sourceLink(), el('p', 'נשמרות רק תשובות שנשלחו. הסבר כתוב נבדק בהערכה עצמית בלבד.', 'small muted'));
+  card.append(details);
   const form = el('form');
-  const answers = choiceGroup('1. איזה ביאור מדויק כאן?', q.options, 'option');
-  const evidence = choiceGroup('2. איזו ראיה מכריעה בין הביאורים?', q.evidence, 'evidence');
+  const answers = choiceGroup('בחר ביאור', q.options, 'option');
+  const evidence = choiceGroup('בחר את הראיה שמבססת את המהלך כולו', q.evidence, 'evidence');
   evidence.hidden = true;
-  const writing = el('div', undefined, 'writing');
+  const writing = el('details', undefined, 'writing');
   writing.hidden = true;
-  const label = el('label', '3. הסבר במילים שלך — רשות', 'writing-label');
+  writing.append(el('summary', 'הוספת הסבר משלך · רשות'));
+  const label = el('label', 'הסבר וראיה', 'writing-label');
   label.htmlFor = 'written';
   const textarea = el('textarea');
   textarea.id = 'written';
@@ -175,23 +179,28 @@ function question() {
   textarea.maxLength = 5000;
   textarea.rows = 4;
   textarea.placeholder = 'כיצד הראיה מבססת את הביאור? מה היא מאפשרת לומר, ומה לא?';
-  writing.append(label, el('p', 'הטקסט אינו נבדק אוטומטית. לאחר השליחה אפשר להעריך אותו מול תשובה ומחוון.', 'small muted'), textarea);
-  const next = button('בחרתי ביאור · ממשיכים לראיה ←', () => {
+  writing.append(el('p', 'הערכה עצמית בלבד, ללא בדיקה אוטומטית.', 'small muted'), label, textarea);
+  const selectedAnswer = el('details');
+  selectedAnswer.hidden = true;
+  const next = button('לראיה ←', () => {
     if (!form.querySelector('input[name="option"]:checked')) {
       answers.querySelector('input').reportValidity();
       return;
     }
     for (const input of answers.querySelectorAll('input')) input.disabled = true;
+    answers.hidden = true;
+    selectedAnswer.replaceChildren(el('summary', 'הביאור שבחרת'), el('p', q.options.find(o => o.id === form.querySelector('input[name="option"]:checked').value).text));
+    selectedAnswer.hidden = false;
     evidence.hidden = false;
     writing.hidden = false;
     next.hidden = true;
     submit.hidden = false;
     evidence.querySelector('input').focus();
   });
-  const submit = el('button', 'בדיקת הביאור והראיה ←', 'button');
+  const submit = el('button', 'לבדיקת התשובה ←', 'button');
   submit.type = 'submit';
   submit.hidden = true;
-  form.append(answers, evidence, writing, next, submit);
+  form.append(answers, selectedAnswer, evidence, writing, next, submit);
   form.addEventListener('submit', event => {
     event.preventDefault();
     const option = form.querySelector('input[name="option"]:checked');
@@ -213,21 +222,27 @@ function feedback(answer, index) {
   const scores = score(q, answer);
   const card = el('section', undefined, 'card quiz-card');
   card.append(el('p', `שאלה ${index + 1} · משוב מתוך המאמר`, 'eyebrow'), el('h1', q.title));
+  const statuses = el('div', undefined, 'tags');
+  statuses.append(el('span', scores.conclusion ? '✓ ביאור מדויק' : '↺ ביאור לחזרה', `tag ${scores.conclusion ? 'correct' : 'incorrect'}`), el('span', scores.evidence ? '✓ ראיה מתאימה' : '↺ ראיה לחזרה', `tag ${scores.evidence ? 'correct' : 'incorrect'}`));
+  const review = el('details');
+  review.append(el('summary', 'פירוט הבדיקה והראיה'));
   for (const [title, field, selected, correct, earned] of [
     ['ביאור', 'options', answer.option, q.correctOption, scores.conclusion],
     ['ראיה', 'evidence', answer.evidence, q.correctEvidence, scores.evidence]
   ]) {
     const block = el('section', undefined, earned ? 'feedback correct' : 'feedback incorrect');
-    block.append(el('h2', `${earned ? '✓' : '↺'} ${title}: ${earned ? 'מדויק' : 'כדאי לחזור ולדייק'}`), el('p', `בחרת: ${q[field].find(item => item.id === selected).text}`), el('p', q[field].find(item => item.id === selected).rationale));
+    block.append(el('h2', `${title}: ${earned ? 'מדויק' : 'לחזרה'}`), el('p', `בחרת: ${q[field].find(item => item.id === selected).text}`), el('p', q[field].find(item => item.id === selected).rationale));
     if (!earned) block.append(el('p', `האפשרות המתאימה: ${q[field].find(item => item.id === correct).text}`));
-    card.append(block);
+    review.append(block);
   }
-  card.append(el('h2', 'הביאור המעוגן במאמר'), el('p', q.model), el('p', `מיקום: ${q.anchor}`, 'small muted'), sourceLink());
+  review.append(el('p', `מיקום: ${q.anchor}`, 'small muted'), sourceLink());
+  card.append(statuses, el('p', q.model), explanation(q), review);
   if (answer.written) {
-    card.append(el('h2', 'ההסבר שכתבת'), el('p', answer.written, 'written-answer'), el('h3', 'דיוק ההסבר · הערכה עצמית בלבד'), el('p', 'סמן רק קריטריונים שההסבר שלך כבר מילא לפני חשיפת התשובה. זו אינה בדיקה אוטומטית.', 'small muted'));
+    const selfReview = el('details');
+    selfReview.append(el('summary', 'בדיקת ההסבר שלך · הערכה עצמית'), el('p', answer.written, 'written-answer'), el('p', 'הערך את מה שכתבת לפני חשיפת התשובה.', 'small muted'));
     const rubric = el('fieldset', undefined, 'rubric');
     rubric.append(el('legend', 'כמה מהקריטריונים ההסבר שלך מילא?'));
-    q.rubric.forEach((text, i) => card.append(el('p', `${i + 1}. ${text}`)));
+    q.rubric.forEach((text, i) => selfReview.append(el('p', `${i + 1}. ${text}`)));
     ['אף קריטריון', 'קריטריון אחד', 'שני הקריטריונים'].forEach((text, i) => {
       const label = el('label', undefined, 'choice');
       const input = el('input');
@@ -244,9 +259,8 @@ function feedback(answer, index) {
       rating.textContent = `הערכה עצמית: ${answer.precision}/2`;
       save();
     });
-    card.append(rubric, rating);
-  } else {
-    card.append(el('p', 'לא נכתב הסבר; דיוק ההסבר לא הוערך ואינו נספר כנכשל.', 'small muted'));
+    selfReview.append(rubric, rating);
+    card.append(selfReview);
   }
   const actions = el('div', undefined, 'actions');
   actions.append(button(index + 1 === run.questionIds.length ? 'לסיכום המבדק ←' : 'לשאלה הבאה ←', question), button('חזרה לבית', home, 'button secondary'));
@@ -267,7 +281,7 @@ function results(run) {
   page();
   const summary = summarize(run, bank);
   const card = el('section', undefined, 'card results-card');
-  card.append(el('p', `${bank.title} · סיכום ניסיון`, 'eyebrow'), el('h1', 'הדיוק שלך, לפי מרכיבים.'), draftNote(), el('p', 'זהו סיכום הניסיון הזה, לא קביעה של שליטה במאמר. כדאי לחזור למקור גם אחרי תשובה נכונה.', 'muted'));
+  card.append(el('p', `${bank.title} · סיכום ניסיון`, 'eyebrow'), el('h1', 'סיכום המבדק'), draftNote(), el('p', 'תוצאה בניסיון הזה, לא מדד לשליטה במאמר.', 'small muted'));
   const metrics = el('div', undefined, 'metrics');
   for (const [value, label, note] of [
     [`${summary.conclusion}/${summary.total}`, 'נכונות הביאור', 'נבדק אוטומטית'],
@@ -278,7 +292,7 @@ function results(run) {
     metric.append(el('strong', value), el('h2', label), el('p', note, 'small muted'));
     metrics.append(metric);
   }
-  card.append(metrics, el('h2', 'מה כדאי לחזור ולדייק?'));
+  card.append(metrics, el('h2', 'לפי נושא'));
   for (const answer of run.answers) {
     const q = bank.questions.find(q => q.id === answer.questionId);
     const result = score(q, answer);
@@ -287,9 +301,9 @@ function results(run) {
     if (!result.conclusion) labels.push('הביאור');
     if (!result.evidence) labels.push('הראיה');
     if (result.precision !== null && result.precision < 2) labels.push('ההסבר לפי הערכתך');
-    row.append(el('h3', q.skill), el('p', labels.length ? `לחזרה: ${labels.join(' · ')}` : 'הביאור והראיה התאימו בניסיון הזה.'), el('p', result.precision === null ? 'דיוק ההסבר לא הוערך.' : `דיוק ההסבר לפי הערכתך: ${result.precision}/2`, 'small muted'));
+    row.append(el('h3', q.title), el('p', labels.length ? `לחזרה: ${labels.join(' · ')}` : '✓ ביאור וראיה'), el('p', result.precision === null ? 'הסבר: לא הוערך' : `הסבר בהערכה עצמית: ${result.precision}/2`, 'small muted'));
     const details = el('details');
-    details.append(el('summary', 'עיון במשוב ובמקור'), el('p', q.model), el('p', q.anchor, 'small muted'));
+    details.append(el('summary', 'משוב ומקור'), el('p', q.model), explanation(q), el('p', q.anchor, 'small muted'));
     if (answer.written) details.append(el('p', `ההסבר שלך: ${answer.written}`, 'written-answer'));
     details.append(sourceLink());
     row.append(details);
@@ -317,6 +331,30 @@ function download(data, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function savedKeys() {
+  return Object.keys(localStorage).filter(key => key === STORAGE_KEY || key.startsWith(`${STORAGE_KEY}:`));
+}
+
+function refreshArchives() {
+  const archives = document.querySelector('#archives');
+  archives.replaceChildren();
+  archives.hidden = archivedKeys.length === 0;
+  if (!archivedKeys.length) return;
+  archives.append(el('summary', 'גיבויים מגרסאות קודמות'));
+  archives.append(el('p', 'השאלות עודכנו. הניסיונות הקודמים נשמרו בנפרד ואינם מצטרפים לציון החדש.', 'small muted'));
+  archivedKeys.forEach((key, index) => {
+    archives.append(button(`ייצוא נתונים קודמים ${index + 1}`, () => {
+      try {
+        const data = localStorage.getItem(key);
+        if (data === null) throw new Error('הנתונים אינם קיימים עוד בדפדפן.');
+        download(data, `diyuk-archive-${index + 1}.json`);
+      } catch (error) {
+        report(`ייצוא הנתונים הקודמים נכשל. ${error.message}`, error);
+      }
+    }, 'text-button'));
+  });
+}
+
 document.querySelector('#export').addEventListener('click', () => {
   if (!progress) return;
   download(JSON.stringify(progress, null, 2), `diyuk-backup-${new Date().toISOString().slice(0, 10)}.json`);
@@ -332,7 +370,7 @@ document.querySelector('#backup-file').addEventListener('change', async event =>
     if (file.size > 2_000_000) throw new Error('הקובץ גדול מדי; הגודל המרבי הוא 2MB.');
     const imported = validateProgress(JSON.parse(await file.text()), bank);
     if (!confirm('הייבוא יחליף את כל ההתקדמות השמורה בדפדפן הזה. להמשיך?')) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
+    localStorage.setItem(currentKey, JSON.stringify(imported));
     progress = imported;
     storageProblem = false;
     notice.hidden = true;
@@ -347,8 +385,10 @@ document.querySelector('#backup-file').addEventListener('change', async event =>
 document.querySelector('#erase').addEventListener('click', () => {
   if (!progress || !confirm('למחוק את כל הניסיונות וההסברים השמורים בדפדפן הזה? הפעולה אינה ניתנת לביטול.')) return;
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    for (const key of savedKeys()) localStorage.removeItem(key);
     progress = emptyProgress();
+    archivedKeys = [];
+    refreshArchives();
     storageProblem = false;
     notice.hidden = true;
     backupStatus.textContent = 'הנתונים המקומיים נמחקו.';
@@ -363,9 +403,12 @@ async function boot() {
     const response = await fetch('./questions.json');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     bank = validateBank(await response.json());
+    currentKey = progressKey(bank);
     progress = emptyProgress();
     try {
-      rawStored = localStorage.getItem(STORAGE_KEY);
+      archivedKeys = savedKeys().filter(key => key !== currentKey);
+      refreshArchives();
+      rawStored = localStorage.getItem(currentKey);
       if (rawStored !== null) progress = validateProgress(JSON.parse(rawStored), bank);
     } catch (error) {
       storageProblem = true;
