@@ -2,7 +2,7 @@ export const STORAGE_KEY = 'diyuk-progress-v1';
 export const MAX_ATTEMPTS = 30;
 
 export function progressKey(bank) {
-  return bank.revision === 1 ? STORAGE_KEY : `${STORAGE_KEY}:${bank.id}:r${bank.revision}`;
+  return bank.id === 'hashamayim-kisi' && bank.revision === 1 ? STORAGE_KEY : `${STORAGE_KEY}:${bank.id}:r${bank.revision}`;
 }
 
 function check(condition, message) {

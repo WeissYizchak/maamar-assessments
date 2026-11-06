@@ -3,6 +3,10 @@ import { STORAGE_KEY, MAX_ATTEMPTS, progressKey, validateBank, validateProgress,
 const main = document.querySelector('#main');
 const notice = document.querySelector('#notice');
 const backupStatus = document.querySelector('#backup-status');
+const assessments = [
+  { id: 'hashamayim-kisi', title: 'השמים כסאי', file: './questions.json' },
+  { id: 'erda-na', title: 'ארדה נא', file: './questions-erda-na.json' }
+];
 let bank;
 let progress;
 let storageProblem = false;
@@ -66,6 +70,15 @@ function home() {
   const hero = el('section', undefined, 'hero');
   hero.append(el('h1', 'לדייק במה שכתוב.'), el('p', 'מבדקים במאמרי חסידות', 'muted'));
   main.append(hero);
+  const selection = el('nav', undefined, 'actions');
+  selection.setAttribute('aria-label', 'בחירת מאמר');
+  for (const assessment of assessments) {
+    const link = el('a', assessment.title, 'button secondary');
+    link.href = `?maamar=${assessment.id}`;
+    if (assessment.id === bank.id) link.setAttribute('aria-current', 'page');
+    selection.append(link);
+  }
+  main.append(selection);
   const card = el('section', undefined, 'card maamar-card');
   card.append(el('h2', bank.title), draftNote());
   const tags = el('div', undefined, 'tags');
@@ -340,8 +353,8 @@ function refreshArchives() {
   archives.replaceChildren();
   archives.hidden = archivedKeys.length === 0;
   if (!archivedKeys.length) return;
-  archives.append(el('summary', 'גיבויים מגרסאות קודמות'));
-  archives.append(el('p', 'השאלות עודכנו. הניסיונות הקודמים נשמרו בנפרד ואינם מצטרפים לציון החדש.', 'small muted'));
+  archives.append(el('summary', 'גיבויים ממבדקים וגרסאות אחרים'));
+  archives.append(el('p', 'ניסיונות ממבדקים וגרסאות אחרים נשמרים בנפרד ואינם מצטרפים לציון המבדק הזה.', 'small muted'));
   archivedKeys.forEach((key, index) => {
     archives.append(button(`ייצוא נתונים קודמים ${index + 1}`, () => {
       try {
@@ -369,7 +382,7 @@ document.querySelector('#backup-file').addEventListener('change', async event =>
   try {
     if (file.size > 2_000_000) throw new Error('הקובץ גדול מדי; הגודל המרבי הוא 2MB.');
     const imported = validateProgress(JSON.parse(await file.text()), bank);
-    if (!confirm('הייבוא יחליף את כל ההתקדמות השמורה בדפדפן הזה. להמשיך?')) return;
+    if (!confirm('הייבוא יחליף את ההתקדמות של המבדק והגרסה הנוכחיים בלבד. להמשיך?')) return;
     localStorage.setItem(currentKey, JSON.stringify(imported));
     progress = imported;
     storageProblem = false;
@@ -400,9 +413,13 @@ document.querySelector('#erase').addEventListener('click', () => {
 
 async function boot() {
   try {
-    const response = await fetch('./questions.json');
+    const selectedId = new URLSearchParams(location.search).get('maamar') ?? 'hashamayim-kisi';
+    const selected = assessments.find(assessment => assessment.id === selectedId);
+    if (!selected) throw new Error('המאמר המבוקש אינו קיים.');
+    const response = await fetch(selected.file);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     bank = validateBank(await response.json());
+    if (bank.id !== selected.id) throw new Error('מזהה המבדק אינו תואם למאמר המבוקש.');
     currentKey = progressKey(bank);
     progress = emptyProgress();
     try {

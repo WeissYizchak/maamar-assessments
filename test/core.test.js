@@ -4,6 +4,26 @@ import { readFile } from 'node:fs/promises';
 import { STORAGE_KEY, progressKey, validateBank, validateProgress, emptyProgress, newRun, score, summarize, MAX_ATTEMPTS } from '../core.js';
 
 const bank = JSON.parse(await readFile(new URL('../questions.json', import.meta.url), 'utf8'));
+const erdaBank = JSON.parse(await readFile(new URL('../questions-erda-na.json', import.meta.url), 'utf8'));
+
+test('Erda Na pilot validates and keeps its progress separate from existing and legacy banks', () => {
+  assert.equal(validateBank(erdaBank), erdaBank);
+  assert.equal(erdaBank.reviewStatus, 'draft');
+  assert.equal(erdaBank.revision, 1);
+  assert.equal(erdaBank.questions.length, 4);
+  assert.equal(erdaBank.source.url, 'https://www.chabad.org/torah-texts/5899146');
+  assert.notEqual(progressKey(erdaBank), progressKey(bank));
+  assert.notEqual(progressKey(erdaBank), STORAGE_KEY);
+  const run = newRun(erdaBank);
+  run.answers = erdaBank.questions.map(q => answer(q));
+  run.completedAt = new Date().toISOString();
+  const data = { ...emptyProgress(), attempts: [run] };
+  assert.deepEqual(validateProgress(JSON.parse(JSON.stringify(data)), erdaBank), data);
+  assert.equal(summarize(run, erdaBank).conclusion, 4);
+  assert.equal(summarize(run, erdaBank).evidence, 4);
+  assert.throws(() => validateProgress(data, bank));
+  assert.throws(() => validateProgress({ ...emptyProgress(), attempts: [completed()] }, erdaBank));
+});
 
 function answer(q, overrides = {}) {
   return { questionId: q.id, option: q.correctOption, evidence: q.correctEvidence, written: '', precision: null, ...overrides };
